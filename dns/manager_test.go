@@ -126,15 +126,6 @@ func TestManager_answerQuestion(t *testing.T) {
 			message: &dns.Msg{Question: []dns.Question{{Name: "bar.foo.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET}}},
 			want:    "ANSWER SECTION:\nbar.foo.local.\t3600\tIN\tCNAME\tfoo.local.\nfoo.local.\t3600\tIN\tA\t127.0.0.1",
 		},
-		{
-			name: "SuccessEmptyCNAMEEntry",
-			records: types.Records{
-				"foo.local._A":         {{Name: "foo.local", Type: "A", Value: "127.0.0.1"}},
-				"bar.foo.local._CNAME": {},
-			},
-			message: &dns.Msg{Question: []dns.Question{{Name: "bar.foo.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET}}},
-			want:    "bar.foo.local.\tIN\t A",
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -204,4 +195,90 @@ func TestManager_HandleDnsRequest_Fail(t *testing.T) {
 
 	m.HandleDnsRequest()(responseWriter, message)
 	assert.Contains(t, buffer.String(), "fail")
+}
+
+func TestManager_findRecords(t *testing.T) {
+	ctx := context.TestContext(nil)
+
+	records := types.Records{
+		"foo.local._A":             {{Name: "foo.local", Type: "A", Value: "127.0.0.1"}},
+		"bar.foo.local._CNAME":     {{Name: "bar.foo.local", Type: "CNAME", Value: "foo.local."}},
+		"wrong.foo.local._CNAME":   {},
+		"*.foo.local._A":           {{Name: "*.foo.local", Type: "A", Value: "127.0.0.3"}},
+		"*.other.local._CNAME":     {{Name: "*.foo.local", Type: "CNAME", Value: "foo.local."}},
+		"*.foo.other.local._CNAME": {{Name: "*.foo.local", Type: "CNAME", Value: "wildcard.other.local."}},
+		"*.test._A":                {{Name: "*.test", Type: "A", Value: "127.0.0.4"}},
+	}
+
+	tests := []struct {
+		name     string
+		records  types.Records
+		question dns.Question
+		want     []*types.Record
+	}{
+		{
+			name:     "SuccessSimpleEntryA",
+			records:  records,
+			question: dns.Question{Name: "foo.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET},
+			want:     append([]*types.Record{}, records["foo.local._A"]...),
+		},
+		{
+			name:     "SuccessSimpleEntryCNAME",
+			records:  records,
+			question: dns.Question{Name: "bar.foo.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET},
+			want:     []*types.Record{{Name: "bar.foo.local", Type: "CNAME", Value: "foo.local."}, {Name: "foo.local", Type: "A", Value: "127.0.0.1"}},
+		},
+		{
+			name:     "SuccessWildcardWholeTld",
+			records:  records,
+			question: dns.Question{Name: "foo.test.", Qtype: dns.TypeA, Qclass: dns.ClassINET},
+			want:     []*types.Record{{Name: "foo.test", Type: "A", Value: "127.0.0.4"}},
+		},
+		{
+			name:     "SuccessWildcardTypeAFirstParentDomain",
+			records:  records,
+			question: dns.Question{Name: "wildcard.foo.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET},
+			want:     []*types.Record{{Name: "wildcard.foo.local", Type: "A", Value: "127.0.0.3"}},
+		},
+		{
+			name:     "SuccessWildcardTypeASecondParentDomain",
+			records:  records,
+			question: dns.Question{Name: "wildcard.second.foo.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET},
+			want:     []*types.Record{{Name: "wildcard.second.foo.local", Type: "A", Value: "127.0.0.3"}},
+		},
+		{
+			name:     "SuccessWildcardTypeCnameFirstParentDomain",
+			records:  records,
+			question: dns.Question{Name: "wildcard.other.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET},
+			want:     []*types.Record{{Name: "wildcard.other.local", Type: "CNAME", Value: "foo.local."}, {Name: "foo.local", Type: "A", Value: "127.0.0.1"}},
+		},
+		{
+			name:     "SuccessWildcardTypeCnameFirstParentDomain",
+			records:  records,
+			question: dns.Question{Name: "wildcard.foo.other.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET},
+			want:     []*types.Record{{Name: "wildcard.foo.other.local", Type: "CNAME", Value: "wildcard.other.local."}, {Name: "wildcard.other.local", Type: "CNAME", Value: "foo.local."}, {Name: "foo.local", Type: "A", Value: "127.0.0.1"}},
+		},
+		{
+			name:     "SuccessEmptyCNAMEEntry",
+			records:  records,
+			question: dns.Question{Name: "wrong.foo.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET},
+			want:     []*types.Record{},
+		},
+		{
+			name:     "SuccessNoResult",
+			records:  records,
+			question: dns.Question{Name: "wrong.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET},
+			want:     []*types.Record{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &Manager{
+				logger:  ctx.Logger,
+				records: tt.records,
+			}
+			got := m.findRecords(tt.question, true)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

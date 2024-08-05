@@ -7,6 +7,8 @@ import (
 	"github.com/alexandreh2ag/go-dns-discover/types"
 	"github.com/miekg/dns"
 	"log/slog"
+	"slices"
+	"strings"
 	"sync"
 )
 
@@ -93,17 +95,22 @@ func (m *Manager) parseQuestions(message *dns.Msg) {
 	}
 }
 func (m *Manager) answerQuestion(message *dns.Msg, question dns.Question) {
-	key := types.FormatRecordKey(question.Name, types.ConvertTypeDNSUintToStr(question.Qtype))
-	if entriesDns, ok := m.records[key]; ok {
-		for _, record := range entriesDns {
-			rr, err := dns.NewRR(
-				fmt.Sprintf("%s %s %s", record.Name, record.Type, record.Value),
-			)
-			if err == nil {
-				message.Answer = append(message.Answer, rr)
-			}
+	records := m.findRecords(question, true)
+	for _, record := range records {
+		rr, err := dns.NewRR(
+			fmt.Sprintf("%s %s %s", record.Name, record.Type, record.Value),
+		)
+		if err == nil {
+			message.Answer = append(message.Answer, rr)
 		}
-		return
+	}
+}
+
+func (m *Manager) findRecords(question dns.Question, isFirst bool) []*types.Record {
+	key := types.FormatRecordKey(question.Name, types.ConvertTypeDNSUintToStr(question.Qtype))
+	fmt.Println("name ", question.Name, "type", question.Qtype)
+	if entriesDns, ok := m.records[key]; ok {
+		return entriesDns
 	}
 
 	if question.Qtype == dns.TypeA {
@@ -111,17 +118,37 @@ func (m *Manager) answerQuestion(message *dns.Msg, question dns.Question) {
 		if entriesDns, ok := m.records[keyCNAME]; ok {
 			if len(entriesDns) == 0 {
 				m.logger.Error(fmt.Sprintf("no DNS records for %s type CNAME", question.Name))
-				return
+				return []*types.Record{}
 			}
 			record := entriesDns[0]
-			rr, err := dns.NewRR(
-				fmt.Sprintf("%s %s %s", record.Name, record.Type, record.Value),
-			)
-			if err == nil {
-				message.Answer = append(message.Answer, rr)
-			}
-			m.answerQuestion(message, dns.Question{Name: record.Value, Qtype: dns.TypeA})
-			return
+			records := m.findRecords(dns.Question{Name: record.Value, Qtype: dns.TypeA}, false)
+			return append([]*types.Record{record}, records...)
 		}
 	}
+
+	if slices.Contains([]uint16{dns.TypeA, dns.TypeCNAME}, question.Qtype) && question.Name != "*." {
+		domainSplit := strings.Split(question.Name, ".")
+		if len(domainSplit) > 0 {
+			i := 1
+			if domainSplit[0] == "*" {
+				i = 2
+			}
+			if question.Qtype == dns.TypeA {
+				records := []*types.Record{}
+				recordsFound := m.findRecords(dns.Question{Name: "*." + strings.Join(domainSplit[i:len(domainSplit)], "."), Qtype: dns.TypeA}, false)
+
+				for index, record := range recordsFound {
+					name := record.Name
+					typeDns := record.Type
+					if index == 0 {
+						name = question.Name[:len(question.Name)-1]
+					}
+
+					records = append(records, &types.Record{Name: name, Type: typeDns, Value: record.Value})
+				}
+				return records
+			}
+		}
+	}
+	return []*types.Record{}
 }

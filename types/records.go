@@ -8,25 +8,6 @@ import (
 
 type Records map[string][]*Record
 
-/*func (r Records) Match(domain string) *Record {
-	if record := r[domain]; record != nil {
-		return record
-	}
-	domainSplit := strings.Split(domain, ".")
-	if len(domainSplit) > 0 && domain != "*." {
-		i := 1
-		if domainSplit[0] == "*" {
-			i = 2
-		}
-		record := r.Match("*." + strings.Join(domainSplit[i:len(domainSplit)], "."))
-		if record != nil {
-			return record
-		}
-	}
-
-	return nil
-}*/
-
 func (r Records) UnmarshalYAML(value *yaml.Node) error {
 	tmp := []*Record{}
 	if err := value.Decode(&tmp); err != nil {
