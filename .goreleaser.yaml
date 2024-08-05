@@ -1,0 +1,64 @@
+# This is an example .goreleaser.yml file with some sensible defaults.
+# Make sure to check the documentation at https://goreleaser.com
+
+# The lines below are called `modelines`. See `:help modeline`
+# Feel free to remove those if you don't want/need to use them.
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
+
+version: 1
+
+before:
+  hooks:
+    - go mod tidy
+
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    ldflags:
+      - -s -w -X github.com/alexandreh2ag/godnsd/version.Version={{.Tag}} -X github.com/alexandreh2ag/godnsd/version.Commit={{.ShortCommit}}
+
+archives:
+  - format: binary
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+
+dockers:
+  - build_flag_templates:
+      - "--platform=linux/arm64"
+      - "--provenance=false"
+    dockerfile: Dockerfile
+    goarch: arm64
+    image_templates:
+      - "alexandreh2ag/godnsd:v{{ .Version }}-arm64"
+    use: buildx
+  - build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--provenance=false"
+    dockerfile: Dockerfile
+    goarch: amd64
+    image_templates:
+      - "alexandreh2ag/godnsd:v{{ .Version }}-amd64"
+    use: buildx
+
+docker_manifests:
+  - image_templates:
+      - "alexandreh2ag/godnsd:v{{ .Version }}-arm64"
+      - "alexandreh2ag/godnsd:v{{ .Version }}-amd64"
+    name_template: "alexandreh2ag/godnsd:{{ .Tag }}"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^doc:"
+      - "^test:"

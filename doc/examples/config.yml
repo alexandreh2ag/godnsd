@@ -1,0 +1,16 @@
+---
+
+#Example
+
+listen_addr: 127.0.0.1:53
+providers:
+  exemple.local:
+    type: fs
+    config:
+      path: "/app/exemple.local.yml"
+  other.local:
+    type: fs
+    config:
+      path: "/app/other.local.yml"
+  docker:
+    type: docker
