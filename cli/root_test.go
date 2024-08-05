@@ -28,9 +28,9 @@ func Test_initConfig_SuccessConfigEmpty(t *testing.T) {
 
 	_ = fsFake.Mkdir(defaultConfigPath, 0775)
 	_ = afero.WriteFile(fsFake, fmt.Sprintf("%s/config.yml", defaultConfigPath), []byte(""), 0644)
-	want := &config.Config{ListenAddr: "0.0.0.0:53", Providers: map[string]config.Provider{}}
+	want := config.DefaultConfig()
 	initConfig(ctx, cmd)
-	assert.Equal(t, want, ctx.Config)
+	assert.Equal(t, &want, ctx.Config)
 }
 
 func Test_initConfig_SuccessOverrideDefaultConfig(t *testing.T) {
@@ -43,9 +43,9 @@ func Test_initConfig_SuccessOverrideDefaultConfig(t *testing.T) {
 	viper.SetFs(fsFake)
 	_ = fsFake.Mkdir(defaultConfigPath, 0775)
 	_ = afero.WriteFile(fsFake, fmt.Sprintf("%s/config.yml", defaultConfigPath), []byte(""), 0644)
-	want := &config.Config{ListenAddr: "0.0.0.0:53", Providers: map[string]config.Provider{}}
+	want := config.DefaultConfig()
 	initConfig(ctx, cmd)
-	assert.Equal(t, want, ctx.Config)
+	assert.Equal(t, &want, ctx.Config)
 }
 
 func Test_initConfig_SuccessWithConfigFlag(t *testing.T) {
@@ -59,10 +59,11 @@ func Test_initConfig_SuccessWithConfigFlag(t *testing.T) {
 	path := "/foo"
 	_ = fsFake.Mkdir(path, 0775)
 	_ = afero.WriteFile(fsFake, fmt.Sprintf("%s/foo.yml", path), []byte("listen_addr: 127.0.0.1:53"), 0644)
-	want := &config.Config{ListenAddr: "127.0.0.1:53", Providers: map[string]config.Provider{}}
+	want := config.DefaultConfig()
+	want.ListenAddr = "127.0.0.1:53"
 	viper.Set(Config, fmt.Sprintf("%s/foo.yml", path))
 	initConfig(ctx, cmd)
-	assert.Equal(t, want, ctx.Config)
+	assert.Equal(t, &want, ctx.Config)
 }
 
 func Test_initConfig_FailWithUnmarshallError(t *testing.T) {

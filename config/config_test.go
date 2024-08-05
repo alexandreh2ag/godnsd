@@ -13,6 +13,6 @@ func TestNewConfig(t *testing.T) {
 
 func TestDefaultConfig(t *testing.T) {
 	got := DefaultConfig()
-	want := Config{ListenAddr: "0.0.0.0:53", Providers: map[string]Provider{}}
+	want := Config{ListenAddr: "0.0.0.0:53", Providers: map[string]Provider{}, Fallback: FallbackConfig{Timeout: 4}}
 	assert.Equal(t, want, got)
 }

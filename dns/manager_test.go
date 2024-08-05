@@ -3,6 +3,8 @@ package dns
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"github.com/alexandreh2ag/go-dns-discover/config"
 	"github.com/alexandreh2ag/go-dns-discover/context"
 	mockMiekgDns "github.com/alexandreh2ag/go-dns-discover/mocks/miekg"
 	mockTypes "github.com/alexandreh2ag/go-dns-discover/mocks/types"
@@ -106,10 +108,12 @@ func TestManager_answerQuestion(t *testing.T) {
 	ctx := context.TestContext(nil)
 
 	tests := []struct {
-		name    string
-		records types.Records
-		message *dns.Msg
-		want    string
+		name        string
+		records     types.Records
+		message     *dns.Msg
+		mockFn      func(clientDns *mockTypes.MockClientDNS)
+		fallbackCfg config.FallbackConfig
+		want        string
 	}{
 		{
 			name:    "SuccessSimpleEntryA",
@@ -126,12 +130,50 @@ func TestManager_answerQuestion(t *testing.T) {
 			message: &dns.Msg{Question: []dns.Question{{Name: "bar.foo.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET}}},
 			want:    "ANSWER SECTION:\nbar.foo.local.\t3600\tIN\tCNAME\tfoo.local.\nfoo.local.\t3600\tIN\tA\t127.0.0.1",
 		},
+		{
+			name:        "SuccessWithFallbackEnabledOneNameserver",
+			records:     types.Records{},
+			message:     &dns.Msg{Question: []dns.Question{{Name: "example.com.", Qtype: dns.TypeA, Qclass: dns.ClassINET}}},
+			fallbackCfg: config.FallbackConfig{Enable: true, Nameservers: []string{"1.1.1.1"}},
+			mockFn: func(clientDns *mockTypes.MockClientDNS) {
+				rr, _ := dns.NewRR(
+					fmt.Sprintf("%s %s %s", "example.com.", "A", "127.0.0.1"),
+				)
+				clientDns.EXPECT().Exchange(gomock.Any(), gomock.Eq("1.1.1.1:53")).Times(1).Return(&dns.Msg{Answer: []dns.RR{rr}}, time.Duration(1), nil)
+			},
+			want: "ANSWER SECTION:\nexample.com.\t3600\tIN\tA\t127.0.0.1",
+		},
+		{
+			name:        "SuccessWithFallbackEnabledTwoNameserverAndFirstFail",
+			records:     types.Records{},
+			message:     &dns.Msg{Question: []dns.Question{{Name: "example.com.", Qtype: dns.TypeA, Qclass: dns.ClassINET}}},
+			fallbackCfg: config.FallbackConfig{Enable: true, Nameservers: []string{"1.1.1.1", "2.2.2.2"}},
+			mockFn: func(clientDns *mockTypes.MockClientDNS) {
+				rr, _ := dns.NewRR(
+					fmt.Sprintf("%s %s %s", "example.com.", "A", "127.0.0.1"),
+				)
+				gomock.InOrder(
+					clientDns.EXPECT().Exchange(gomock.Any(), gomock.Eq("1.1.1.1:53")).Times(1).Return(nil, time.Duration(1), errors.New("fail")),
+					clientDns.EXPECT().Exchange(gomock.Any(), gomock.Eq("2.2.2.2:53")).Times(1).Return(&dns.Msg{Answer: []dns.RR{rr}}, time.Duration(1), nil),
+				)
+			},
+			want: "ANSWER SECTION:\nexample.com.\t3600\tIN\tA\t127.0.0.1",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			client := mockTypes.NewMockClientDNS(ctrl)
+			if tt.mockFn != nil {
+				tt.mockFn(client)
+			}
+
 			m := &Manager{
-				logger:  ctx.Logger,
-				records: tt.records,
+				logger:      ctx.Logger,
+				records:     tt.records,
+				fallbackCfg: tt.fallbackCfg,
+				clientDNS:   client,
 			}
 			m.answerQuestion(tt.message, tt.message.Question[0])
 			assert.Contains(t, tt.message.String(), tt.want)
@@ -277,8 +319,25 @@ func TestManager_findRecords(t *testing.T) {
 				logger:  ctx.Logger,
 				records: tt.records,
 			}
-			got := m.findRecords(tt.question, true)
+			got := m.findRecords(tt.question)
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestManager_answerWithFallback(t *testing.T) {
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	client := mockTypes.NewMockClientDNS(ctrl)
+	client.EXPECT().Exchange(gomock.Any(), gomock.Eq("1.1.1.1:53")).Times(1).Return(&dns.Msg{}, time.Duration(1), nil)
+	m := &Manager{
+		clientDNS: client,
+	}
+	got, err := m.answerWithFallback("1.1.1.1", &dns.Msg{})
+	if !assert.NoError(t, err, fmt.Sprintf("answerWithFallback(%v, %v)", "1.1.1.1", &dns.Msg{})) {
+		return
+	}
+	assert.Equalf(t, &dns.Msg{}, got, "answerWithFallback(%v, %v)", "1.1.1.1", &dns.Msg{})
+
 }

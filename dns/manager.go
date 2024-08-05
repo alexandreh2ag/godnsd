@@ -3,6 +3,7 @@ package dns
 import (
 	"dario.cat/mergo"
 	"fmt"
+	"github.com/alexandreh2ag/go-dns-discover/config"
 	"github.com/alexandreh2ag/go-dns-discover/context"
 	"github.com/alexandreh2ag/go-dns-discover/types"
 	"github.com/miekg/dns"
@@ -10,18 +11,22 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 )
 
 func CreateManager(ctx *context.Context, providers types.Providers) *Manager {
-	return &Manager{logger: ctx.Logger, providers: providers, done: ctx.Done()}
+	clientDNS := &dns.Client{Net: "udp", Timeout: time.Duration(ctx.Config.Fallback.Timeout) * time.Second}
+	return &Manager{logger: ctx.Logger, providers: providers, done: ctx.Done(), fallbackCfg: ctx.Config.Fallback, clientDNS: clientDNS}
 }
 
 type Manager struct {
 	logger                *slog.Logger
+	fallbackCfg           config.FallbackConfig
 	providers             types.Providers
 	records               types.Records
 	cacheProvidersRecords map[string]types.Records
 
+	clientDNS         types.ClientDNS
 	configurationChan chan types.Message
 	done              chan bool
 }
@@ -95,20 +100,36 @@ func (m *Manager) parseQuestions(message *dns.Msg) {
 	}
 }
 func (m *Manager) answerQuestion(message *dns.Msg, question dns.Question) {
-	records := m.findRecords(question, true)
-	for _, record := range records {
-		rr, err := dns.NewRR(
-			fmt.Sprintf("%s %s %s", record.Name, record.Type, record.Value),
-		)
-		if err == nil {
-			message.Answer = append(message.Answer, rr)
+	records := m.findRecords(question)
+
+	if len(records) > 0 {
+		for _, record := range records {
+			rr, err := dns.NewRR(
+				fmt.Sprintf("%s %s %s", record.Name, record.Type, record.Value),
+			)
+			if err == nil {
+				message.Answer = append(message.Answer, rr)
+			}
+		}
+	} else {
+		if m.fallbackCfg.Enable {
+			msg := &dns.Msg{
+				MsgHdr:   dns.MsgHdr{Id: message.Id, Opcode: dns.OpcodeQuery, RecursionDesired: true, RecursionAvailable: true},
+				Question: []dns.Question{{Name: question.Name, Qtype: question.Qtype, Qclass: question.Qclass}},
+			}
+			for _, nameserver := range m.fallbackCfg.Nameservers {
+				res, err := m.answerWithFallback(nameserver, msg)
+				if err == nil {
+					message.Answer = res.Answer
+					return
+				}
+			}
 		}
 	}
 }
 
-func (m *Manager) findRecords(question dns.Question, isFirst bool) []*types.Record {
+func (m *Manager) findRecords(question dns.Question) []*types.Record {
 	key := types.FormatRecordKey(question.Name, types.ConvertTypeDNSUintToStr(question.Qtype))
-	fmt.Println("name ", question.Name, "type", question.Qtype)
 	if entriesDns, ok := m.records[key]; ok {
 		return entriesDns
 	}
@@ -121,7 +142,7 @@ func (m *Manager) findRecords(question dns.Question, isFirst bool) []*types.Reco
 				return []*types.Record{}
 			}
 			record := entriesDns[0]
-			records := m.findRecords(dns.Question{Name: record.Value, Qtype: dns.TypeA}, false)
+			records := m.findRecords(dns.Question{Name: record.Value, Qtype: dns.TypeA})
 			return append([]*types.Record{record}, records...)
 		}
 	}
@@ -135,7 +156,7 @@ func (m *Manager) findRecords(question dns.Question, isFirst bool) []*types.Reco
 			}
 			if question.Qtype == dns.TypeA {
 				records := []*types.Record{}
-				recordsFound := m.findRecords(dns.Question{Name: "*." + strings.Join(domainSplit[i:len(domainSplit)], "."), Qtype: dns.TypeA}, false)
+				recordsFound := m.findRecords(dns.Question{Name: "*." + strings.Join(domainSplit[i:len(domainSplit)], "."), Qtype: dns.TypeA})
 
 				for index, record := range recordsFound {
 					name := record.Name
@@ -151,4 +172,13 @@ func (m *Manager) findRecords(question dns.Question, isFirst bool) []*types.Reco
 		}
 	}
 	return []*types.Record{}
+}
+
+func (m *Manager) answerWithFallback(nameserver string, message *dns.Msg) (*dns.Msg, error) {
+	if i := strings.Index(nameserver, ":"); i < 0 {
+		nameserver += ":53"
+	}
+
+	response, _, err := m.clientDNS.Exchange(message, nameserver)
+	return response, err
 }
