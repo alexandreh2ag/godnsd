@@ -13,8 +13,8 @@ import (
 	docketClient "github.com/docker/docker/client"
 	"github.com/traefik/paerser/parser"
 	"log/slog"
+	"regexp"
 	"slices"
-	"strings"
 )
 
 func init() {
@@ -22,8 +22,9 @@ func init() {
 }
 
 const (
-	dockerKeyType      = "docker"
-	defaultNetworkName = "default"
+	dockerKeyType             = "docker"
+	defaultNetworkName        = "bridge"
+	defaultComposeNetworkName = "default"
 )
 
 var (
@@ -140,12 +141,13 @@ func (d Docker) formatLabelsToRecords(container *dockerTypes.Container) []*types
 }
 
 func (d Docker) findContainerIp(container *dockerTypes.Container, recordContainer *ConfigRecordContainer) string {
-	recordNetworkName := fmt.Sprintf("_%s", defaultNetworkName)
+	dockerComposeProjectName := container.Labels["com.docker.compose.project"]
+	regexNetwork := regexp.MustCompile(fmt.Sprintf("^(%s|%s_%s)$", defaultNetworkName, dockerComposeProjectName, defaultComposeNetworkName))
 	if recordContainer.Network != "" && recordContainer.Network != defaultNetworkName {
-		recordNetworkName = recordContainer.Network
+		regexNetwork = regexp.MustCompile(fmt.Sprintf("^(%s|%s_%s)$", recordContainer.Network, dockerComposeProjectName, recordContainer.Network))
 	}
 	for networkName, network := range container.NetworkSettings.Networks {
-		if strings.Contains(networkName, recordNetworkName) {
+		if regexNetwork.MatchString(networkName) {
 			return network.IPAddress
 		}
 	}

@@ -67,25 +67,41 @@ func TestDocker_findContainerIp(t *testing.T) {
 		want            string
 	}{
 		{
-			name: "SuccessDefault",
-			container: &dockerTypes.Container{NetworkSettings: &dockerTypes.SummaryNetworkSettings{
-				Networks: map[string]*dockerNetwork.EndpointSettings{"project_other": {IPAddress: "127.0.0.2"}, "project_default": {IPAddress: "127.0.0.1"}},
+			name: "SuccessDefaultDockerCompose",
+			container: &dockerTypes.Container{Labels: map[string]string{"com.docker.compose.project": "project"}, NetworkSettings: &dockerTypes.SummaryNetworkSettings{
+				Networks: map[string]*dockerNetwork.EndpointSettings{"project_default": {IPAddress: "127.0.0.1"}, "project_other": {IPAddress: "127.0.0.2"}},
 			}},
 			recordContainer: &ConfigRecordContainer{},
 			want:            "127.0.0.1",
 		},
 		{
-			name: "SuccessWithSpecificNetwork",
-			container: &dockerTypes.Container{NetworkSettings: &dockerTypes.SummaryNetworkSettings{
-				Networks: map[string]*dockerNetwork.EndpointSettings{"project_other": {IPAddress: "127.0.0.2"}, "project_default": {IPAddress: "127.0.0.1"}},
+			name: "SuccessDefaultDocker",
+			container: &dockerTypes.Container{Labels: map[string]string{"com.docker.compose.project": "project"}, NetworkSettings: &dockerTypes.SummaryNetworkSettings{
+				Networks: map[string]*dockerNetwork.EndpointSettings{"bridge": {IPAddress: "127.0.0.1"}},
+			}},
+			recordContainer: &ConfigRecordContainer{},
+			want:            "127.0.0.1",
+		},
+		{
+			name: "SuccessWithSpecificNetworkFullName",
+			container: &dockerTypes.Container{Labels: map[string]string{"com.docker.compose.project": "project"}, NetworkSettings: &dockerTypes.SummaryNetworkSettings{
+				Networks: map[string]*dockerNetwork.EndpointSettings{"project_default": {IPAddress: "127.0.0.1"}, "project_other": {IPAddress: "127.0.0.2"}},
 			}},
 			recordContainer: &ConfigRecordContainer{Network: "project_other"},
 			want:            "127.0.0.2",
 		},
 		{
+			name: "SuccessWithSimilarNetworkName",
+			container: &dockerTypes.Container{Labels: map[string]string{"com.docker.compose.project": "project"}, NetworkSettings: &dockerTypes.SummaryNetworkSettings{
+				Networks: map[string]*dockerNetwork.EndpointSettings{"project_other2": {IPAddress: "127.0.0.1"}, "project_other": {IPAddress: "127.0.0.2"}},
+			}},
+			recordContainer: &ConfigRecordContainer{Network: "other"},
+			want:            "127.0.0.2",
+		},
+		{
 			name: "SuccessWithUnknownNetwork",
-			container: &dockerTypes.Container{NetworkSettings: &dockerTypes.SummaryNetworkSettings{
-				Networks: map[string]*dockerNetwork.EndpointSettings{"project_other": {IPAddress: "127.0.0.2"}, "project_default": {IPAddress: "127.0.0.1"}},
+			container: &dockerTypes.Container{Labels: map[string]string{"com.docker.compose.project": "project"}, NetworkSettings: &dockerTypes.SummaryNetworkSettings{
+				Networks: map[string]*dockerNetwork.EndpointSettings{"project_default": {IPAddress: "127.0.0.1"}, "project_other": {IPAddress: "127.0.0.2"}},
 			}},
 			recordContainer: &ConfigRecordContainer{Network: "unknown"},
 			want:            "",
@@ -115,6 +131,7 @@ func TestDocker_formatLabelsToRecords(t *testing.T) {
 				Names:           []string{"test"},
 				NetworkSettings: &dockerTypes.SummaryNetworkSettings{Networks: map[string]*dockerNetwork.EndpointSettings{"project_default": {IPAddress: "127.0.0.1"}, "project_other": {IPAddress: "127.0.0.2"}}},
 				Labels: map[string]string{
+					"com.docker.compose.project":                          "project",
 					fmt.Sprintf("%s.enable", types.AppName):               "true",
 					fmt.Sprintf("%s.records.foo.name", types.AppName):     "foo.local",
 					fmt.Sprintf("%s.records.foo.type", types.AppName):     "A",
@@ -190,6 +207,7 @@ func TestDocker_fetchRecords(t *testing.T) {
 							Networks: map[string]*dockerNetwork.EndpointSettings{"project_default": {IPAddress: "127.0.0.1"}},
 						},
 						Labels: map[string]string{
+							"com.docker.compose.project":                      "project",
 							fmt.Sprintf("%s.enable", types.AppName):           "true",
 							fmt.Sprintf("%s.records.foo.name", types.AppName): "foo.local",
 							fmt.Sprintf("%s.records.foo.type", types.AppName): "A",
@@ -257,6 +275,7 @@ func TestDocker_listen(t *testing.T) {
 				Networks: map[string]*dockerNetwork.EndpointSettings{"project_default": {IPAddress: "127.0.0.1"}},
 			},
 			Labels: map[string]string{
+				"com.docker.compose.project":                      "project",
 				fmt.Sprintf("%s.enable", types.AppName):           "true",
 				fmt.Sprintf("%s.records.foo.name", types.AppName): "foo.local",
 				fmt.Sprintf("%s.records.foo.type", types.AppName): "A",
@@ -293,6 +312,7 @@ func TestDocker_Provide_Success(t *testing.T) {
 				Networks: map[string]*dockerNetwork.EndpointSettings{"project_default": {IPAddress: "127.0.0.1"}},
 			},
 			Labels: map[string]string{
+				"com.docker.compose.project":                      "project",
 				fmt.Sprintf("%s.enable", types.AppName):           "true",
 				fmt.Sprintf("%s.records.foo.name", types.AppName): "foo.local",
 				fmt.Sprintf("%s.records.foo.type", types.AppName): "A",
