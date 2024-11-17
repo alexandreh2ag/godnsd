@@ -25,9 +25,9 @@ func (r Records) UnmarshalYAML(value *yaml.Node) error {
 }
 
 type Record struct {
-	Name  string `yaml:"name"`
-	Type  string `yaml:"type"`
-	Value string `yaml:"value"`
+	Name  string `yaml:"name" json:"name"`
+	Type  string `yaml:"type" json:"type"`
+	Value string `yaml:"value" json:"value"`
 }
 
 func FormatRecordKey(name string, typeRecord string) string {
@@ -44,7 +44,11 @@ func ConvertTypeDNSUintToStr(typeRecord uint16) string {
 		return "CNAME"
 	case dns.TypeTXT:
 		return "TXT"
+	case dns.TypeSOA:
+		return "SOA"
+	case dns.TypeNS:
+		return "NS"
 	default:
-		return "A"
+		return "UNKNOWN"
 	}
 }

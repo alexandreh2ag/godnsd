@@ -250,6 +250,9 @@ func TestManager_findRecords(t *testing.T) {
 		"*.other.local._CNAME":     {{Name: "*.foo.local", Type: "CNAME", Value: "foo.local."}},
 		"*.foo.other.local._CNAME": {{Name: "*.foo.local", Type: "CNAME", Value: "wildcard.other.local."}},
 		"*.test._A":                {{Name: "*.test", Type: "A", Value: "127.0.0.4"}},
+		"local._SOA":               {{Name: "local", Type: "SOA", Value: "ns.local mail.local 1000 10800 60 300 60"}},
+		"foo.local._NS":            {{Name: "foo.local", Type: "NS", Value: "ns.foo.local"}},
+		"*.local._NS":              {{Name: "*.local", Type: "NS", Value: "ns.local"}},
 	}
 
 	tests := []struct {
@@ -307,6 +310,30 @@ func TestManager_findRecords(t *testing.T) {
 			want:     []*types.Record{},
 		},
 		{
+			name:     "SuccessSOA",
+			records:  records,
+			question: dns.Question{Name: "local.", Qtype: dns.TypeSOA, Qclass: dns.ClassINET},
+			want:     []*types.Record{{Name: "local", Type: "SOA", Value: "ns.local mail.local 1000 10800 60 300 60"}},
+		},
+		{
+			name:     "SuccessNS",
+			records:  records,
+			question: dns.Question{Name: "foo.local.", Qtype: dns.TypeNS, Qclass: dns.ClassINET},
+			want:     []*types.Record{{Name: "foo.local", Type: "NS", Value: "ns.foo.local"}},
+		},
+		{
+			name:     "SuccessNS",
+			records:  records,
+			question: dns.Question{Name: "ns.bar.local.", Qtype: dns.TypeNS, Qclass: dns.ClassINET},
+			want:     []*types.Record{{Name: "ns.bar.local", Type: "NS", Value: "ns.local"}},
+		},
+		{
+			name:     "SuccessNSNotFound",
+			records:  records,
+			question: dns.Question{Name: "ns.bar.", Qtype: dns.TypeNS, Qclass: dns.ClassINET},
+			want:     []*types.Record{},
+		},
+		{
 			name:     "SuccessNoResult",
 			records:  records,
 			question: dns.Question{Name: "wrong.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET},
@@ -340,4 +367,15 @@ func TestManager_answerWithFallback(t *testing.T) {
 	}
 	assert.Equalf(t, &dns.Msg{}, got, "answerWithFallback(%v, %v)", "1.1.1.1", &dns.Msg{})
 
+}
+
+func TestManager_GetRecords(t *testing.T) {
+	records := types.Records{
+		"foo.local._A": {{Name: "foo.local", Type: "A", Value: "127.0.0.1"}},
+	}
+	m := &Manager{
+		records: records,
+	}
+	got := m.GetRecords()
+	assert.Equal(t, records, got)
 }

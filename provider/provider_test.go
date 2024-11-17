@@ -69,7 +69,7 @@ func TestCreateProviders(t *testing.T) {
 	}
 }
 
-func Test_createProvider_Success(t *testing.T) {
+func Test_CreateProvider_Success(t *testing.T) {
 	ctx := context.TestContext(nil)
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -78,27 +78,27 @@ func Test_createProvider_Success(t *testing.T) {
 	FactoryProviderMapping["dummy"] = func(ctx *context.Context, id string, cfg config.Provider) (types.Provider, error) {
 		return providerMock, nil
 	}
-	got, err := createProvider(ctx, "foo", config.Provider{Type: "dummy"})
+	got, err := CreateProvider(ctx, "foo", config.Provider{Type: "dummy"})
 	assert.NoError(t, err)
 	assert.Equal(t, providerMock, got)
 }
 
-func Test_createProvider_FailedCreate(t *testing.T) {
+func Test_CreateProvider_FailedCreate(t *testing.T) {
 	ctx := context.TestContext(nil)
 
 	FactoryProviderMapping["dummy"] = func(ctx *context.Context, id string, cfg config.Provider) (types.Provider, error) {
 		return nil, errors.New("fail")
 	}
-	got, err := createProvider(ctx, "foo", config.Provider{Type: "dummy"})
+	got, err := CreateProvider(ctx, "foo", config.Provider{Type: "dummy"})
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "fail")
 	assert.Nil(t, got)
 }
 
-func Test_createProvider_FailedUnknownType(t *testing.T) {
+func Test_CreateProvider_FailedUnknownType(t *testing.T) {
 	ctx := context.TestContext(nil)
 
-	got, err := createProvider(ctx, "foo", config.Provider{Type: "unknown"})
+	got, err := CreateProvider(ctx, "foo", config.Provider{Type: "unknown"})
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, "provider type 'unknown' for foo does not exist")
 	assert.Nil(t, got)

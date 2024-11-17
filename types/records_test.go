@@ -71,9 +71,19 @@ func Test_ConvertTypeDNSUintToStr(t *testing.T) {
 			want: "TXT",
 		},
 		{
+			name: "Type SOA",
+			Type: dns.TypeSOA,
+			want: "SOA",
+		},
+		{
+			name: "Type NS",
+			Type: dns.TypeNS,
+			want: "NS",
+		},
+		{
 			name: "Type Unknown",
 			Type: 10000,
-			want: "A",
+			want: "UNKNOWN",
 		},
 	}
 	for _, tt := range tests {

@@ -3,6 +3,10 @@
 #Example
 
 listen_addr: 127.0.0.1:53
+http:
+  enable: true
+  listen: 127.0.0.1:8080
+  enable_provider: true
 providers:
   exemple.local:
     type: fs

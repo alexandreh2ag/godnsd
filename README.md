@@ -78,6 +78,47 @@ services:
       - custom
 ```
 
+#### Api
+
+The provider api will wait for http request to add record in memory (all record added will be lost when service is stopped).
+To use it, you have to enable http server.
+
+```yaml
+# /etc/godnsd/config.yml
+http:
+  enable: true
+  listen: 127.0.0.1:8080
+  enable_provider: true
+```
+
+##### Endpoint
+
+* `POST /api/records` -> Add a record
+* `DELETE /api/records` -> Remove a record
+* `POST /api/records/present` -> Add a record (Acme DNS challenge compatibility)
+* `DELETE /api/records/cleanup` -> Remove a record (Acme DNS challenge compatibility)
+
+All of these endpoints needs HTTP header `Content-Type`: `application/json`.
+
+Body for /api/records [POST|DELETE]
+
+```json
+{
+  "name": "_acme.foo.bar.local.",
+  "type": "TXT",
+  "value": "token"
+}
+```
+
+Body for /api/records/present & /api/records/cleanup [POST]
+
+```json
+{
+  "fqdn": "_acme.foo.bar.local.",
+  "value": "token"
+}
+```
+
 ### Global configuration
 
 `godnsd` can be configured to set log level or change default template used for README.md image.
@@ -103,6 +144,11 @@ Flags:
   -l, --level string    Define log level (default "INFO")
 
 ```
+
+## API
+
+When server HTTP is enabled the endpoint `GET /api/records` will be availlable.
+This endpoint return all DNS records currently registered.
 
 ## Development
 
