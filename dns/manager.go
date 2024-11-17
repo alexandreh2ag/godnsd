@@ -43,7 +43,7 @@ func (m *Manager) Start() {
 			defer wg.Done()
 			err := prd.Provide(m.configurationChan)
 			if err != nil {
-				m.logger.Error(fmt.Sprintf("error when provide %s: %v", provider.GetId(), err))
+				m.logger.Error(fmt.Sprintf("error when provide %s: %v", prd.GetId(), err))
 			}
 		}(provider)
 	}
@@ -76,12 +76,16 @@ func (m *Manager) listen() {
 	}
 }
 
+func (m *Manager) GetRecords() types.Records {
+	return m.records
+}
+
 func (m *Manager) HandleDnsRequest() func(w dns.ResponseWriter, r *dns.Msg) {
 	return func(w dns.ResponseWriter, r *dns.Msg) {
 		message := new(dns.Msg)
 		message.SetReply(r)
 		message.Compress = false
-
+		m.logger.Debug(fmt.Sprintf("received a DNS message %s", message.String()))
 		switch r.Opcode {
 		case dns.OpcodeQuery:
 			m.parseQuestions(message)
@@ -132,6 +136,22 @@ func (m *Manager) findRecords(question dns.Question) []*types.Record {
 	key := types.FormatRecordKey(question.Name, types.ConvertTypeDNSUintToStr(question.Qtype))
 	if entriesDns, ok := m.records[key]; ok {
 		return entriesDns
+	}
+
+	if question.Qtype == dns.TypeNS {
+		domainSplit := strings.Split(question.Name, ".")
+		if len(domainSplit) > 0 && question.Name != "*." {
+			i := 1
+			if domainSplit[0] == "*" {
+				i = 2
+			}
+			recordsFound := m.findRecords(dns.Question{Name: "*." + strings.Join(domainSplit[i:len(domainSplit)], "."), Qtype: dns.TypeNS})
+
+			for _, record := range recordsFound {
+				record.Name = question.Name[:len(question.Name)-1]
+			}
+			return recordsFound
+		}
 	}
 
 	if question.Qtype == dns.TypeA {

@@ -26,7 +26,7 @@ func TestGetStartRunFn_Success(t *testing.T) {
 	path := "/app"
 	_ = fsFake.Mkdir(path, 0775)
 
-	_ = afero.WriteFile(fsFake, fmt.Sprintf("%s/config.yml", path), []byte("{listen_addr: '127.0.0.1:0', providers: {file: {type: fs, config: {path: /app/dns.yml}}}}"), 0644)
+	_ = afero.WriteFile(fsFake, fmt.Sprintf("%s/config.yml", path), []byte("{listen_addr: '127.0.0.1:0', http: {enable: true, listen: 127.0.0.1:0, enable_provider: true}, providers: {file: {type: fs, config: {path: /app/dns.yml}}}}"), 0644)
 	_ = afero.WriteFile(fsFake, fmt.Sprintf("%s/dns.yml", path), []byte("[{name: foo.local, type: A, value: 127.0.0.1}]"), 0644)
 	cmd.SetArgs([]string{CmdNameStart, "--" + Config, fmt.Sprintf("%s/config.yml", path)})
 	go func() {

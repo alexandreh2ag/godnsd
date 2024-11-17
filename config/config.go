@@ -4,6 +4,7 @@ type Config struct {
 	ListenAddr string              `mapstructure:"listen_addr" validate:"required"`
 	Providers  map[string]Provider `mapstructure:"providers" validate:"omitempty,required,dive"`
 	Fallback   FallbackConfig      `mapstructure:"fallback" validate:"omitempty,required"`
+	Http       HttpConfig          `mapstructure:"http" validate:"omitempty,required"`
 }
 
 type Provider struct {
@@ -15,6 +16,12 @@ type FallbackConfig struct {
 	Enable      bool     `mapstructure:"enable"`
 	Nameservers []string `mapstructure:"nameservers" validate:"required_if=Enable true,dive,required"`
 	Timeout     int64    `mapstructure:"timeout" validate:"omitempty,required"`
+}
+
+type HttpConfig struct {
+	Enable            bool   `mapstructure:"enable"`
+	Listen            string `mapstructure:"listen" validate:"required_if=Enable true"`
+	EnableApiProvider bool   `mapstructure:"enable_provider"`
 }
 
 func NewConfig() Config {

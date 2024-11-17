@@ -15,7 +15,7 @@ func CreateProviders(ctx *context.Context) (types.Providers, error) {
 	instances := types.Providers{}
 	for id, providerCfg := range ctx.Config.Providers {
 		ctx.Logger.Debug(fmt.Sprintf("Create provider %s", id))
-		instance, err := createProvider(ctx, id, providerCfg)
+		instance, err := CreateProvider(ctx, id, providerCfg)
 		if err != nil {
 			return instances, err
 		}
@@ -24,7 +24,7 @@ func CreateProviders(ctx *context.Context) (types.Providers, error) {
 	return instances, nil
 }
 
-func createProvider(ctx *context.Context, id string, cfg config.Provider) (types.Provider, error) {
+func CreateProvider(ctx *context.Context, id string, cfg config.Provider) (types.Provider, error) {
 	if fn, ok := FactoryProviderMapping[cfg.Type]; ok {
 		return fn(ctx, id, cfg)
 	}
