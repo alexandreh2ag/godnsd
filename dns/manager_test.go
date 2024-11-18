@@ -251,6 +251,7 @@ func TestManager_findRecords(t *testing.T) {
 		"*.foo.other.local._CNAME": {{Name: "*.foo.local", Type: "CNAME", Value: "wildcard.other.local."}},
 		"*.test._A":                {{Name: "*.test", Type: "A", Value: "127.0.0.4"}},
 		"local._SOA":               {{Name: "local", Type: "SOA", Value: "ns.local mail.local 1000 10800 60 300 60"}},
+		"*.local._SOA":             {{Name: "*.local", Type: "SOA", Value: "ns.local mail.local 1000 10800 60 300 60"}},
 		"foo.local._NS":            {{Name: "foo.local", Type: "NS", Value: "ns.foo.local"}},
 		"*.local._NS":              {{Name: "*.local", Type: "NS", Value: "ns.local"}},
 	}
@@ -314,6 +315,12 @@ func TestManager_findRecords(t *testing.T) {
 			records:  records,
 			question: dns.Question{Name: "local.", Qtype: dns.TypeSOA, Qclass: dns.ClassINET},
 			want:     []*types.Record{{Name: "local", Type: "SOA", Value: "ns.local mail.local 1000 10800 60 300 60"}},
+		},
+		{
+			name:     "SuccessSOAWildcard",
+			records:  records,
+			question: dns.Question{Name: "foo.local.", Qtype: dns.TypeSOA, Qclass: dns.ClassINET},
+			want:     []*types.Record{{Name: "foo.local", Type: "SOA", Value: "ns.local mail.local 1000 10800 60 300 60"}},
 		},
 		{
 			name:     "SuccessNS",

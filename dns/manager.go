@@ -138,14 +138,14 @@ func (m *Manager) findRecords(question dns.Question) []*types.Record {
 		return entriesDns
 	}
 
-	if question.Qtype == dns.TypeNS {
+	if slices.Contains([]uint16{dns.TypeNS, dns.TypeSOA}, question.Qtype) {
 		domainSplit := strings.Split(question.Name, ".")
 		if len(domainSplit) > 0 && question.Name != "*." {
 			i := 1
 			if domainSplit[0] == "*" {
 				i = 2
 			}
-			recordsFound := m.findRecords(dns.Question{Name: "*." + strings.Join(domainSplit[i:len(domainSplit)], "."), Qtype: dns.TypeNS})
+			recordsFound := m.findRecords(dns.Question{Name: "*." + strings.Join(domainSplit[i:len(domainSplit)], "."), Qtype: question.Qtype})
 
 			for _, record := range recordsFound {
 				record.Name = question.Name[:len(question.Name)-1]
