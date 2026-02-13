@@ -3,15 +3,16 @@ package cli
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"syscall"
+	"testing"
+	"time"
+
 	"github.com/alexandreh2ag/go-dns-discover/context"
 	"github.com/miekg/dns"
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
-	"io"
-	"syscall"
-	"testing"
-	"time"
 )
 
 func TestGetStartRunFn_Success(t *testing.T) {
@@ -43,7 +44,7 @@ func TestGetStartRunFn_Success(t *testing.T) {
 	}
 	res, _, err := dnsClient.Exchange(req, server.PacketConn.LocalAddr().String())
 	assert.NoError(t, err)
-	assert.Contains(t, res.String(), "ANSWER SECTION:\nfoo.local.\t3600\tIN\tA\t127.0.0.1\n")
+	assert.Contains(t, res.String(), "ANSWER SECTION:\nfoo.local.\t0\tIN\tA\t127.0.0.1\n")
 
 	ctx.Signal() <- syscall.SIGTERM
 	time.Sleep(100 * time.Millisecond)

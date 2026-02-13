@@ -2,9 +2,14 @@ package config
 
 type Config struct {
 	ListenAddr string              `mapstructure:"listen_addr" validate:"required"`
+	DNS        DNSConfig           `mapstructure:"dns" validate:"omitempty,required"`
 	Providers  map[string]Provider `mapstructure:"providers" validate:"omitempty,required,dive"`
 	Fallback   FallbackConfig      `mapstructure:"fallback" validate:"omitempty,required"`
 	Http       HttpConfig          `mapstructure:"http" validate:"omitempty,required"`
+}
+
+type DNSConfig struct {
+	DefaultTTL int `mapstructure:"default_ttl" validate:"gte=0"`
 }
 
 type Provider struct {
@@ -30,6 +35,7 @@ func NewConfig() Config {
 
 func DefaultConfig() Config {
 	cfg := NewConfig()
+	cfg.DNS.DefaultTTL = 0
 	cfg.ListenAddr = "0.0.0.0:53"
 	cfg.Providers = map[string]Provider{}
 	cfg.Fallback.Timeout = 4

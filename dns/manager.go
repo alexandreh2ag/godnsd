@@ -1,25 +1,27 @@
 package dns
 
 import (
-	"dario.cat/mergo"
 	"fmt"
-	"github.com/alexandreh2ag/go-dns-discover/config"
-	"github.com/alexandreh2ag/go-dns-discover/context"
-	"github.com/alexandreh2ag/go-dns-discover/types"
-	"github.com/miekg/dns"
 	"log/slog"
 	"slices"
 	"strings"
 	"sync"
 	"time"
+
+	"dario.cat/mergo"
+	"github.com/alexandreh2ag/go-dns-discover/config"
+	"github.com/alexandreh2ag/go-dns-discover/context"
+	"github.com/alexandreh2ag/go-dns-discover/types"
+	"github.com/miekg/dns"
 )
 
 func CreateManager(ctx *context.Context, providers types.Providers) *Manager {
 	clientDNS := &dns.Client{Net: "udp", Timeout: time.Duration(ctx.Config.Fallback.Timeout) * time.Second}
-	return &Manager{logger: ctx.Logger, providers: providers, done: ctx.Done(), fallbackCfg: ctx.Config.Fallback, clientDNS: clientDNS}
+	return &Manager{config: ctx.Config.DNS, logger: ctx.Logger, providers: providers, done: ctx.Done(), fallbackCfg: ctx.Config.Fallback, clientDNS: clientDNS}
 }
 
 type Manager struct {
+	config                config.DNSConfig
 	logger                *slog.Logger
 	fallbackCfg           config.FallbackConfig
 	providers             types.Providers
@@ -109,7 +111,7 @@ func (m *Manager) answerQuestion(message *dns.Msg, question dns.Question) {
 	if len(records) > 0 {
 		for _, record := range records {
 			rr, err := dns.NewRR(
-				fmt.Sprintf("%s %s %s", record.Name, record.Type, record.Value),
+				fmt.Sprintf("%s %d %s %s", record.Name, m.config.DefaultTTL, record.Type, record.Value),
 			)
 			if err == nil {
 				message.Answer = append(message.Answer, rr)

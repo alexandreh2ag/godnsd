@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/alexandreh2ag/go-dns-discover/config"
 	"github.com/alexandreh2ag/go-dns-discover/context"
 	mockMiekgDns "github.com/alexandreh2ag/go-dns-discover/mocks/miekg"
@@ -12,8 +15,6 @@ import (
 	"github.com/miekg/dns"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
-	"testing"
-	"time"
 )
 
 func TestCreateManager(t *testing.T) {
@@ -119,7 +120,7 @@ func TestManager_answerQuestion(t *testing.T) {
 			name:    "SuccessSimpleEntryA",
 			records: types.Records{"foo.local._A": {{Name: "foo.local", Type: "A", Value: "127.0.0.1"}}},
 			message: &dns.Msg{Question: []dns.Question{{Name: "foo.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET}}},
-			want:    "ANSWER SECTION:\nfoo.local.\t3600\tIN\tA\t127.0.0.1",
+			want:    "ANSWER SECTION:\nfoo.local.\t0\tIN\tA\t127.0.0.1",
 		},
 		{
 			name: "SuccessSimpleEntryCNAME",
@@ -128,7 +129,7 @@ func TestManager_answerQuestion(t *testing.T) {
 				"bar.foo.local._CNAME": {{Name: "bar.foo.local", Type: "CNAME", Value: "foo.local."}},
 			},
 			message: &dns.Msg{Question: []dns.Question{{Name: "bar.foo.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET}}},
-			want:    "ANSWER SECTION:\nbar.foo.local.\t3600\tIN\tCNAME\tfoo.local.\nfoo.local.\t3600\tIN\tA\t127.0.0.1",
+			want:    "ANSWER SECTION:\nbar.foo.local.\t0\tIN\tCNAME\tfoo.local.\nfoo.local.\t0\tIN\tA\t127.0.0.1",
 		},
 		{
 			name:        "SuccessWithFallbackEnabledOneNameserver",
@@ -186,7 +187,7 @@ func TestManager_parseQuestions(t *testing.T) {
 
 	records := types.Records{"foo.local._A": {{Name: "foo.local", Type: "A", Value: "127.0.0.1"}}, "bar.local._A": {{Name: "bar.local", Type: "A", Value: "127.0.0.1"}}}
 	message := &dns.Msg{Question: []dns.Question{{Name: "foo.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET}, {Name: "bar.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET}}}
-	want := "ANSWER SECTION:\nfoo.local.\t3600\tIN\tA\t127.0.0.1\nbar.local.\t3600\tIN\tA\t127.0.0.1\n"
+	want := "ANSWER SECTION:\nfoo.local.\t0\tIN\tA\t127.0.0.1\nbar.local.\t0\tIN\tA\t127.0.0.1\n"
 	m := &Manager{
 		logger:  ctx.Logger,
 		records: records,
@@ -203,7 +204,7 @@ func TestManager_HandleDnsRequest_Success(t *testing.T) {
 
 	records := types.Records{"foo.local._A": {{Name: "foo.local", Type: "A", Value: "127.0.0.1"}}}
 	message := &dns.Msg{MsgHdr: dns.MsgHdr{Opcode: dns.OpcodeQuery}, Question: []dns.Question{{Name: "foo.local.", Qtype: dns.TypeA, Qclass: dns.ClassINET}}}
-	want := "ANSWER SECTION:\nfoo.local.\t3600\tIN\tA\t127.0.0.1\n"
+	want := "ANSWER SECTION:\nfoo.local.\t0\tIN\tA\t127.0.0.1\n"
 	m := &Manager{
 		logger:  ctx.Logger,
 		records: records,
